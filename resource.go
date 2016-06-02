@@ -13,7 +13,7 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/derekdowling/go-json-spec-handler"
-	"github.com/derekdowling/jsh-api/store"
+	"github.com/sgleizes/jsh-api/store"
 )
 
 const (
@@ -49,7 +49,7 @@ your own routes using the goji.Mux API:
 */
 type Resource struct {
 	*goji.Mux
-	// The singular name of the resource type("user", "post", etc)
+	// The single name of the resource type("user", "post", etc)
 	Type string
 	// Routes is a list of routes registered to the resource
 	Routes []string
@@ -76,7 +76,46 @@ func NewResource(resourceType string) *Resource {
 	}
 }
 
-// NewCRUDResource generates a resource
+// NewSingleResource generates a single resource i.e. a resource that does not semantically belong in a collection.
+func NewSingleResource(resourceType string, storage store.SingleCRUD) *Resource {
+	resource := NewResource(resourceType)
+	resource.SingleCRUD(storage)
+	return resource
+}
+
+/*
+SingleCRUD is syntactic sugar and a shortcut for registering all JSON API CRUD
+routes for a compatible storage implementation:
+
+Registers handlers for:
+	GET    /resource
+	POST   /resource
+	DELETE /resource
+	PATCH  /resource
+*/
+func (res *Resource) SingleCRUD(storage store.SingleCRUD) {
+	res.SingleGet(storage.Get)
+	res.SinglePatch(storage.Update)
+	res.Post(storage.Save)
+	res.SingleDelete(storage.Delete)
+}
+
+// SingleGet registers a `GET /resource` handler for the single resource
+func (res *Resource) SingleGet(storage store.Get) {
+	res.get(patRoot, storage)
+}
+
+// SingleDelete registers a `DELETE /resource` handler for the single resource
+func (res *Resource) SingleDelete(storage store.Delete) {
+	res.delete(patRoot, storage)
+}
+
+// SinglePatch registers a `PATCH /resource` handler for the single resource
+func (res *Resource) SinglePatch(storage store.Update) {
+	res.patch(patRoot, storage)
+}
+
+// NewCRUDResource creates a new CRUD resources instance.
 func NewCRUDResource(resourceType string, storage store.CRUD) *Resource {
 	resource := NewResource(resourceType)
 	resource.CRUD(storage)
@@ -104,62 +143,27 @@ func (res *Resource) CRUD(storage store.CRUD) {
 
 // Post registers a `POST /resource` handler with the resource
 func (res *Resource) Post(storage store.Save) {
-	res.HandleFuncC(
-		pat.Post(patRoot),
-		func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-			res.postHandler(ctx, w, r, storage)
-		},
-	)
-
-	res.addRoute(post, patRoot)
+	res.post(patRoot, storage)
 }
 
 // Get registers a `GET /resource/:id` handler for the resource
 func (res *Resource) Get(storage store.Get) {
-	res.HandleFuncC(
-		pat.Get(patID),
-		func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-			res.getHandler(ctx, w, r, storage)
-		},
-	)
-
-	res.addRoute(get, patID)
+	res.get(patID, storage)
 }
 
 // List registers a `GET /resource` handler for the resource
 func (res *Resource) List(storage store.List) {
-	res.HandleFuncC(
-		pat.Get(patRoot),
-		func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-			res.listHandler(ctx, w, r, storage)
-		},
-	)
-
-	res.addRoute(get, patRoot)
+	res.list(patRoot, storage)
 }
 
 // Delete registers a `DELETE /resource/:id` handler for the resource
 func (res *Resource) Delete(storage store.Delete) {
-	res.HandleFuncC(
-		pat.Delete(patID),
-		func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-			res.deleteHandler(ctx, w, r, storage)
-		},
-	)
-
-	res.addRoute(delete, patID)
+	res.delete(patID, storage)
 }
 
 // Patch registers a `PATCH /resource/:id` handler for the resource
 func (res *Resource) Patch(storage store.Update) {
-	res.HandleFuncC(
-		pat.Patch(patID),
-		func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-			res.patchHandler(ctx, w, r, storage)
-		},
-	)
-
-	res.addRoute(patch, patID)
+	res.patch(patID, storage)
 }
 
 // ToOne registers a `GET /resource/:id/(relationships/)<resourceType>` route which
@@ -246,6 +250,66 @@ func (res *Resource) Action(actionName string, storage store.Get) {
 	)
 
 	res.addRoute(patch, matcher)
+}
+
+// post registers a `POST` handler with the resource
+func (res *Resource) post(p string, storage store.Save) {
+	res.HandleFuncC(
+		pat.Post(p),
+		func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+			res.postHandler(ctx, w, r, storage)
+		},
+	)
+
+	res.addRoute(post, p)
+}
+
+// Get registers a `GET` handler for the resource
+func (res *Resource) get(p string, storage store.Get) {
+	res.HandleFuncC(
+		pat.Get(p),
+		func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+			res.getHandler(ctx, w, r, storage)
+		},
+	)
+
+	res.addRoute(get, p)
+}
+
+// List registers a `GET` handler for the resource
+func (res *Resource) list(p string, storage store.List) {
+	res.HandleFuncC(
+		pat.Get(p),
+		func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+			res.listHandler(ctx, w, r, storage)
+		},
+	)
+
+	res.addRoute(get, p)
+}
+
+// Delete registers a `DELETE` handler for the resource
+func (res *Resource) delete(p string, storage store.Delete) {
+	res.HandleFuncC(
+		pat.Delete(p),
+		func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+			res.deleteHandler(ctx, w, r, storage)
+		},
+	)
+
+	res.addRoute(delete, p)
+}
+
+// Patch registers a `PATCH` handler for the resource
+func (res *Resource) patch(p string, storage store.Update) {
+	res.HandleFuncC(
+		pat.Patch(p),
+		func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+			res.patchHandler(ctx, w, r, storage)
+		},
+	)
+
+	res.addRoute(patch, p)
 }
 
 // POST /resources

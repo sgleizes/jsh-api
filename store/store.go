@@ -7,6 +7,14 @@ import (
 	"golang.org/x/net/context"
 )
 
+// SingleCRUD implements all sub-storage functions for a single resource
+type SingleCRUD interface {
+	Save(ctx context.Context, object *jsh.Object) (*jsh.Object, jsh.ErrorType)
+	Get(ctx context.Context, id string) (*jsh.Object, jsh.ErrorType)
+	Update(ctx context.Context, object *jsh.Object) (*jsh.Object, jsh.ErrorType)
+	Delete(ctx context.Context, id string) jsh.ErrorType
+}
+
 // CRUD implements all sub-storage functions
 type CRUD interface {
 	Save(ctx context.Context, object *jsh.Object) (*jsh.Object, jsh.ErrorType)
